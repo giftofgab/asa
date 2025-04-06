@@ -1,15 +1,20 @@
 import os
 import requests
 import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timezone
 import json
 import time
+import base64
 
 # ========== STEP 1: Todoist API ==========
 API_TOKEN = os.getenv("API_TOKEN")  # Fetch API token from environment variable
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
+
+# GitHub credentials
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO = "username/repository"  # Replace with your GitHub repo (e.g., "user/repo")
+GITHUB_BRANCH = "main"  # Replace with your branch name
+GITHUB_FILE_PATH = "data/todoist_completed_tasks.csv"  # Path within the repo
 
 # Fetch Completed Tasks From Jan 1, 2025 to Today
 start_date = "2025-01-01T00:00:00Z"
@@ -43,10 +48,10 @@ while True:
         project_id = task.get("project_id", "N/A")
         completed_date = task.get("completed_date", "N/A")
         completed_tasks.append({
-            "Original Task ID": task_id,
             "Content": content,
             "Project ID": project_id,
-            "Completed Date": completed_date
+            "Completed Date": completed_date,
+            "Original Task ID": task_id  # Add original ID here
         })
 
     next_cursor = data.get("next_cursor")
@@ -56,52 +61,43 @@ while True:
 
     time.sleep(0.2)  # Small delay for rate limiting
 
+# Create DataFrame
 completed_df = pd.DataFrame(completed_tasks)
 
-# ========== STEP 2: Update Google Sheet ==========
-# Google Sheets Auth
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-# Load the Google credentials from the environment variable
+# ========== STEP 2: Save to CSV Locally ==========
 try:
-    google_credentials = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
-    client = gspread.authorize(creds)
-    print("✅ Google Sheets authentication successful.")
+    download_path = os.path.expanduser("~/Downloads/todoist_completed_tasks.csv")
+    completed_df.to_csv(download_path, index=False)
+    print(f"✅ CSV saved to: {download_path}")
 except Exception as e:
-    print(f"❌ Failed to authenticate with Google Sheets: {e}")
-    exit(1)
+    print(f"❌ Failed to save CSV: {e}")
 
-# Open the correct sheet and tab
-try:
-    spreadsheet = client.open("ASA log")
-    worksheet = spreadsheet.worksheet("todoist_completed_tasks")
-    print("✅ Successfully accessed Google Sheet.")
-except Exception as e:
-    print(f"❌ Failed to open the spreadsheet or worksheet: {e}")
-    exit(1)
+# ========== STEP 3: Upload to GitHub ==========
+def upload_to_github(local_file, repo, branch, remote_path):
+    try:
+        with open(local_file, "rb") as file:
+            content = base64.b64encode(file.read()).decode()
 
-# Clear previous content
-try:
-    worksheet.clear()
-    print("✅ Worksheet cleared successfully.")
-except Exception as e:
-    print(f"❌ Failed to clear the worksheet: {e}")
-    exit(1)
+        url = f"https://api.github.com/repos/{repo}/contents/{remote_path}"
+        response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
+        sha = response.json().get("sha")
 
-# Clean the DataFrame
-clean_df = completed_df.fillna("").astype(str)
+        payload = {
+            "message": "Update completed tasks CSV",
+            "content": content,
+            "branch": branch
+        }
+        if sha:
+            payload["sha"] = sha
 
-# Upload DataFrame to Google Sheets
-try:
-    if not clean_df.empty:
-        worksheet.update([clean_df.columns.values.tolist()] + clean_df.values.tolist())
-        print("✅ Google Sheet updated successfully.")
-    else:
-        print("⚠️ No completed tasks found. Sheet not updated.")
-except Exception as e:
-    print(f"❌ Failed to update Google Sheet: {e}")
-    exit(1)
+        response = requests.put(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"}, data=json.dumps(payload))
+
+        if response.status_code in [200, 201]:
+            print("✅ File successfully uploaded to GitHub!")
+        else:
+            print(f"❌ GitHub upload failed: {response.json().get('message')}")
+    except Exception as e:
+        print(f"❌ Error uploading to GitHub: {e}")
+
+# Upload to GitHub
+upload_to_github(download_path, GITHUB_REPO, GITHUB_BRANCH, GITHUB_FILE_PATH)
