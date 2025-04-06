@@ -20,9 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install requests pandas gspread oauth2client
 
-      - name: Set environment variables
-        run: |
-          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
+      - name: Set up Google credentials
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
         shell: bash
 
       - name: Run script
