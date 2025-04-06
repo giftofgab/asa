@@ -30,5 +30,3 @@ jobs:
           API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
         run: python3 todoist_fetch_completed.py
 
-
-^X
