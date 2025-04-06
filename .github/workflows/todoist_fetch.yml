@@ -1,0 +1,34 @@
+name: Fetch Todoist Completed Tasks
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Runs every day at 6 AM UTC
+
+jobs:
+  run-todoist-fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: pip install requests pandas gspread oauth2client
+
+      - name: Set environment variables
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
+        shell: bash
+
+      - name: Run script
+        env:
+          API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+        run: python3 todoist_fetch_completed.py
+
+
+^X
