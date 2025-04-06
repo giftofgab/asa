@@ -1,47 +1,73 @@
 import requests
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import time
 
-# Replace with your Todoist API Token
+# ========== STEP 1: Todoist API ==========
 API_TOKEN = "6e36c8b1cda40ab13abd31de805358cddc4e445a"
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# Fetch All Active Tasks
-tasks_url = "https://api.todoist.com/rest/v2/tasks"
-tasks_response = requests.get(tasks_url, headers=HEADERS)
-tasks = tasks_response.json()
+# Fetch Completed Tasks From Jan 1, 2025 to Today
+start_date = "2025-01-01T00:00:00Z"
+end_date = datetime.utcnow().isoformat("T") + "Z"
 
-# Convert to DataFrame
-tasks_df = pd.DataFrame(tasks)
-
-# Fetch Completed Tasks Since January 1, 2024
 completed_tasks = []
-next_cursor = None  # For pagination
+next_cursor = None
+fetch_count = 0
 
 while True:
     completed_url = "https://api.todoist.com/sync/v9/completed/get_all"
     params = {
-        "since": "2024-01-01T00:00:00Z",  # Fetch all tasks from January 1, 2024
-        "until": "2024-12-31T23:59:59Z",  # Optional: Limit to 2024
-        "limit": 200,  # Fetch in batches of 200
-        "cursor": next_cursor
+        "since": start_date,
+        "until": end_date,
+        "limit": 200
     }
-    
+    if next_cursor:
+        params["cursor"] = next_cursor
+
     completed_response = requests.get(completed_url, headers=HEADERS, params=params)
     data = completed_response.json()
-    
-    completed_tasks.extend(data.get("items", []))  # Add to list
-    
-    next_cursor = data.get("next_cursor")  # Check if there's more data
-    if not next_cursor:  # Stop if no more pages
+
+    batch = data.get("items", [])
+    completed_tasks.extend(batch)
+    fetch_count += len(batch)
+    print(f"Fetched {len(batch)} tasks (Total so far: {fetch_count})")
+
+    next_cursor = data.get("next_cursor")
+    if not next_cursor:
+        print("✅ All completed tasks fetched.")
         break
 
-# Convert completed tasks to DataFrame
+    time.sleep(0.2)  # Small delay for rate limiting
+
 completed_df = pd.DataFrame(completed_tasks)
 
-# Merge DataFrames
-tasks_df["completed"] = tasks_df["id"].isin(completed_df["task_id"])
+# ========== STEP 2: Update Google Sheet ==========
+# Google Sheets Auth
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
 
-# Save to CSV
-completed_df.to_csv("todoist_completed_tasks.csv", index=False)
+# Open the correct sheet and tab
+spreadsheet = client.open("ASA log")
+worksheet = spreadsheet.worksheet("todoist_completed_tasks")
 
-print("Todoist completed tasks data successfully exported with LATEST data! YAY")
+# Clear previous content
+worksheet.clear()
+
+# Clean the DataFrame
+clean_df = completed_df.fillna("").astype(str)
+
+# Upload DataFrame to Google Sheets
+if not clean_df.empty:
+    worksheet.update(
+        [clean_df.columns.values.tolist()] + clean_df.values.tolist()
+    )
+    print("✅ Google Sheet updated successfully.")
+else:
+    print("⚠️ No completed tasks found. Sheet not updated.")
