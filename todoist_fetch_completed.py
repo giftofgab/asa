@@ -38,15 +38,27 @@ while True:
 
     # Extract the original task ID and other useful data
     for task in batch:
-        task_id = task.get("task_id", "N/A")  # Original task ID
+        # Clean the ID by ensuring it is numeric
+        task_id = str(task.get("task_id", "")).strip("'").strip('"')  # Original task ID
+        project_id = str(task.get("project_id", "")).strip("'").strip('"')
+
+        # Fetch and format the completion date properly
+        completed_date = task.get("completed_date", "")
+        if completed_date:
+            try:
+                # Convert to readable date format
+                completed_date = datetime.strptime(completed_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                completed_date = "N/A"
+
         content = task.get("content", "N/A")
-        project_id = task.get("project_id", "N/A")
-        completed_date = task.get("completed_date", "N/A")
+        
+        # Append cleaned and formatted data
         completed_tasks.append({
             "Content": content,
             "Project ID": project_id,
             "Completed Date": completed_date,
-            "Original Task ID": task_id  # Add original ID here
+            "Original Task ID": task_id
         })
 
     next_cursor = data.get("next_cursor")
