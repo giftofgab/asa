@@ -36,24 +36,20 @@ while True:
     fetch_count += len(batch)
     print(f"Fetched {len(batch)} tasks (Total so far: {fetch_count})")
 
-    # Extract the original task ID, completed task ID, and other useful data
+    # Extract task data
     for task in batch:
-        # Safely extract IDs and clean them up
-        task_id = str(task.get("task_id", "")).replace("'", "").replace('"', "").strip()
-        completed_task_id = str(task.get("id", "")).replace("'", "").replace('"', "").strip()
-        project_id = str(task.get("project_id", "")).replace("'", "").replace('"', "").strip()
+        # Correctly format the IDs as strings without extra characters
+        task_id = str(int(task.get("task_id", 0))) if task.get("task_id") else "N/A"
+        project_id = str(int(task.get("project_id", 0))) if task.get("project_id") else "N/A"
 
-        # Extract date: Try to get the "completed_date" or fallback to "date_added"
-        completed_date = task.get("completed_date", "")
-        if not completed_date:
-            completed_date = task.get("date_added", "N/A")
-        
-        if completed_date:
+        # Use the correct date field
+        date_added = task.get("date_added", "N/A")
+        if date_added != "N/A":
             try:
-                # Convert to readable date format if possible
-                completed_date = datetime.strptime(completed_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
+                # Convert to readable date format
+                date_added = datetime.strptime(date_added, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
             except Exception:
-                completed_date = completed_date  # Use raw format if conversion fails
+                pass  # If conversion fails, keep the raw format
 
         content = task.get("content", "N/A")
         
@@ -61,9 +57,8 @@ while True:
         completed_tasks.append({
             "Content": content,
             "Project ID": project_id,
-            "Completed Date": completed_date,
-            "Original Task ID": task_id,
-            "Completed Task ID": completed_task_id  # New column for the completed task ID
+            "Date Added": date_added,  # Use the date_added field
+            "Original Task ID": task_id
         })
 
     next_cursor = data.get("next_cursor")
