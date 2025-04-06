@@ -36,17 +36,17 @@ while True:
     fetch_count += len(batch)
     print(f"Fetched {len(batch)} tasks (Total so far: {fetch_count})")
 
-    # Extract the original task ID and other useful data
+    # Extract the original task ID, completed task ID, and other useful data
     for task in batch:
-        # Clean the ID by ensuring it is numeric
-        task_id = str(task.get("task_id", "")).strip("'").strip('"')  # Original task ID
+        # Extract and clean task IDs
+        task_id = str(task.get("task_id", "")).strip("'").strip('"')
+        completed_task_id = str(task.get("id", "")).strip("'").strip('"')  # Completed task ID
         project_id = str(task.get("project_id", "")).strip("'").strip('"')
 
-        # Fetch and format the completion date properly
+        # Fetch and format the completion date
         completed_date = task.get("completed_date", "")
         if completed_date:
             try:
-                # Convert to readable date format
                 completed_date = datetime.strptime(completed_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
             except Exception:
                 completed_date = "N/A"
@@ -58,7 +58,8 @@ while True:
             "Content": content,
             "Project ID": project_id,
             "Completed Date": completed_date,
-            "Original Task ID": task_id
+            "Original Task ID": task_id,
+            "Completed Task ID": completed_task_id  # New column for the completed task ID
         })
 
     next_cursor = data.get("next_cursor")
