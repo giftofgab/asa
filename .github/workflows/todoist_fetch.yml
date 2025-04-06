@@ -3,7 +3,7 @@ name: Fetch Todoist Completed Tasks
 on:
   schedule:
     - cron: '0 6 * * *'  # Runs every day at 6 AM UTC
-	workflow_dispatch: #Allows manual trigger
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   run-todoist-fetch:
@@ -30,5 +30,4 @@ jobs:
         env:
           API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
         run: python3 todoist_fetch_completed.py
-
 
