@@ -33,9 +33,21 @@ while True:
     data = completed_response.json()
 
     batch = data.get("items", [])
-    completed_tasks.extend(batch)
     fetch_count += len(batch)
     print(f"Fetched {len(batch)} tasks (Total so far: {fetch_count})")
+
+    # Extract the original task ID and other useful data
+    for task in batch:
+        task_id = task.get("task_id", "N/A")  # Original task ID
+        content = task.get("content", "N/A")
+        project_id = task.get("project_id", "N/A")
+        completed_date = task.get("completed_date", "N/A")
+        completed_tasks.append({
+            "Original Task ID": task_id,
+            "Content": content,
+            "Project ID": project_id,
+            "Completed Date": completed_date
+        })
 
     next_cursor = data.get("next_cursor")
     if not next_cursor:
