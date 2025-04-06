@@ -26,6 +26,9 @@ jobs:
           echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
         shell: bash
 
+      - name: Check environment variable
+        run: echo $GOOGLE_CREDENTIALS
+
       - name: Run script
         env:
           API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
