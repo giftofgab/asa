@@ -1,17 +1,19 @@
+import os
 import requests
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from datetime import datetime, timezone
+import json
 import time
 
 # ========== STEP 1: Todoist API ==========
-API_TOKEN = "6e36c8b1cda40ab13abd31de805358cddc4e445a"
+API_TOKEN = os.getenv("API_TOKEN")  # Fetch API token from environment variable
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
 
 # Fetch Completed Tasks From Jan 1, 2025 to Today
 start_date = "2025-01-01T00:00:00Z"
-end_date = datetime.utcnow().isoformat("T") + "Z"
+end_date = datetime.now(timezone.utc).isoformat("T")
 
 completed_tasks = []
 next_cursor = None
@@ -50,24 +52,44 @@ scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
+
+# Load the Google credentials from the environment variable
+try:
+    google_credentials = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
+    client = gspread.authorize(creds)
+    print("✅ Google Sheets authentication successful.")
+except Exception as e:
+    print(f"❌ Failed to authenticate with Google Sheets: {e}")
+    exit(1)
 
 # Open the correct sheet and tab
-spreadsheet = client.open("ASA log")
-worksheet = spreadsheet.worksheet("todoist_completed_tasks")
+try:
+    spreadsheet = client.open("ASA log")
+    worksheet = spreadsheet.worksheet("todoist_completed_tasks")
+    print("✅ Successfully accessed Google Sheet.")
+except Exception as e:
+    print(f"❌ Failed to open the spreadsheet or worksheet: {e}")
+    exit(1)
 
 # Clear previous content
-worksheet.clear()
+try:
+    worksheet.clear()
+    print("✅ Worksheet cleared successfully.")
+except Exception as e:
+    print(f"❌ Failed to clear the worksheet: {e}")
+    exit(1)
 
 # Clean the DataFrame
 clean_df = completed_df.fillna("").astype(str)
 
 # Upload DataFrame to Google Sheets
-if not clean_df.empty:
-    worksheet.update(
-        [clean_df.columns.values.tolist()] + clean_df.values.tolist()
-    )
-    print("✅ Google Sheet updated successfully.")
-else:
-    print("⚠️ No completed tasks found. Sheet not updated.")
+try:
+    if not clean_df.empty:
+        worksheet.update([clean_df.columns.values.tolist()] + clean_df.values.tolist())
+        print("✅ Google Sheet updated successfully.")
+    else:
+        print("⚠️ No completed tasks found. Sheet not updated.")
+except Exception as e:
+    print(f"❌ Failed to update Google Sheet: {e}")
+    exit(1)
